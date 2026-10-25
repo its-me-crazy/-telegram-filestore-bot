@@ -173,8 +173,7 @@ async def send_stored_files(client: Client, chat_id: int, param: str):
         last_msg = sent_messages[-1]
         warn_msg = await client.send_message(
             chat_id=chat_id,
-            text=f"**⚠️ Tʜɪs Fɪʟᴇ ɪs ᴅᴇʟᴇᴛɪɴɢ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ɪɴ {AUTO_DELETE_TIME // 60} ᴍɪɴᴜᴛᴇs !**\n\n"
-                 f"**📌 Fᴏʀᴡᴀʀᴅ ɪᴛ ᴛᴏ ʏᴏᴜʀ Sᴀᴠᴇᴅ Mᴇssᴀɢᴇs..!**",
+            text=f"**Tʜɪs Fɪʟᴇ ɪs ᴅᴇʟᴇᴛɪɴɢ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ ɪɴ {AUTO_DELETE_TIME // 60} ᴍɪɴᴜᴛᴇs. Fᴏʀᴡᴀʀᴅ ɪᴛ ᴛᴏ ʏᴏᴜʀ Sᴀᴠᴇᴅ Mᴇssᴀɢᴇs..!**",
             reply_to_message_id=last_msg.id
         )
         
@@ -437,8 +436,7 @@ async def list_fsub_cmd(client: Client, message: Message):
 
 @bot.on_message(filters.command("stats") & filters.user(ADMINS))
 async def stats_cmd(client: Client, message: Message):
-
-    loading_msg = await message.reply_text("⏳ **Extracting stats...**")
+    loading_msg = await message.reply_text(" **Extracting stats...**")
 
     users_data = await db.get_all_users_data()
     total_users = len(users_data)
@@ -452,7 +450,7 @@ async def stats_cmd(client: Client, message: Message):
 
         u_name = user_doc.get("first_name", "User")
         username_str = None
-
+        
         try:
             user_obj = await client.get_users(uid)
             if user_obj:
@@ -463,13 +461,11 @@ async def stats_cmd(client: Client, message: Message):
         except Exception:
             pass
 
-        # If no public username exists, fall back to showing their display name
         display_identifier = username_str if username_str else u_name
 
         joined_date = user_doc.get("date", datetime.datetime.now().strftime("%Y-%m-%d"))
         day_name = user_doc.get("day", datetime.datetime.now().strftime("%A"))
 
-        # Formatted in bold as requested
         stats_text += f"• **[{display_identifier}](tg://user?id={uid})** **[`{uid}`]** **[`{joined_date}`]** **[`{day_name}`]**\n"
 
     buttons = [[InlineKeyboardButton("• Cʟᴏsᴇ •", callback_data="close")]]
@@ -479,7 +475,21 @@ async def stats_cmd(client: Client, message: Message):
     except Exception:
         await message.reply_text(stats_text, reply_markup=InlineKeyboardMarkup(buttons), disable_web_page_preview=True)
 
+@bot.on_message(filters.command("ping") & filters.private)
+async def ping_handler(client: Client, message: Message):
+    user_id = message.from_user.id
 
+    unjoined, status_list = await check_fsub(client, user_id)
+    if unjoined:
+        # Do not show anything if they haven't joined yet
+        return
+        
+    start_time = time.time()
+    sent_msg = await message.reply_text("Pinging...")
+    end_time = time.time()
+    ping_time = round((end_time - start_time) * 1000, 2)
+    await sent_msg.edit_text(f"🏓 **Pong!**\n`{ping_time}ms`")
+    
 @bot.on_message(filters.command("broadcast") & filters.user(ADMINS))
 async def broadcast_cmd(client: Client, message: Message):
     if not message.reply_to_message:
