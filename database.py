@@ -10,21 +10,22 @@ fsub_col = db["force_subs"]
 
 # User Management (Saves name and join details persistently)
 async def add_user(user_id: int, first_name: str = "User"):
-    existing = await users_col.find_one({"user_id": user_id})
     now = datetime.datetime.now()
-    if not existing:
-        await users_col.insert_one({
-            "user_id": user_id,
-            "first_name": first_name,
-            "date": now.strftime("%Y-%m-%d"),
-            "day": now.strftime("%A")
-        })
-    else:
-        # Update name if it changes, but keep original join date
-        await users_col.update_one(
-            {"user_id": user_id},
-            {"$set": {"first_name": first_name}}
-        )
+    # upsert=True creates the document if it doesn't exist, or updates it if it does!
+    await users_col.update_one(
+        {"user_id": user_id},
+        {
+            "$setOnInsert": {
+                "user_id": user_id,
+                "date": now.strftime("%Y-%m-%d"),
+                "day": now.strftime("%A")
+            },
+            "$set": {
+                "first_name": first_name if first_name and first_name != "User" else "User"
+            }
+        },
+        upsert=True
+    )
 
 async def get_all_users():
     return [doc["user_id"] async for doc in users_col.find({})]
