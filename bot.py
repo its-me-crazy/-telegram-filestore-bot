@@ -63,8 +63,10 @@ async def check_fsub(client: Client, user_id: int):
 @bot.on_message(filters.command("start") & filters.private)
 async def start_handler(client: Client, message: Message):
     user_id = message.from_user.id
-    user_name = message.from_user.first_name
-    await db.add_user(user_id, user_name)
+    user_name = message.from_user.first_name or "User"
+    username = message.from_user.username
+    
+    await db.add_user(user_id, user_name, username)
     
     args = message.text.split(maxsplit=1)
     param = args[1] if len(args) > 1 else None
@@ -436,7 +438,7 @@ async def list_fsub_cmd(client: Client, message: Message):
 
 @bot.on_message(filters.command("stats") & filters.user(ADMINS))
 async def stats_cmd(client: Client, message: Message):
-    loading_msg = await message.reply_text(" **Extracting stats...**")
+    loading_msg = await message.reply_text("⏳ **Extracting stats...**")
 
     users_data = await db.get_all_users_data()
     total_users = len(users_data)
@@ -449,19 +451,13 @@ async def stats_cmd(client: Client, message: Message):
             continue
 
         u_name = user_doc.get("first_name", "User")
-        username_str = None
+        saved_username = user_doc.get("username")
         
-        try:
-            user_obj = await client.get_users(uid)
-            if user_obj:
-                if user_obj.first_name:
-                    u_name = user_obj.first_name
-                if user_obj.username:
-                    username_str = f"@{user_obj.username}"
-        except Exception:
-            pass
-
-        display_identifier = username_str if username_str else u_name
+        # Format display name: use @username if available, otherwise use their first name
+        if saved_username:
+            display_identifier = f"@{saved_username}"
+        else:
+            display_identifier = u_name
 
         joined_date = user_doc.get("date", datetime.datetime.now().strftime("%Y-%m-%d"))
         day_name = user_doc.get("day", datetime.datetime.now().strftime("%A"))
