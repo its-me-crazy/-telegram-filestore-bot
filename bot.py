@@ -439,7 +439,7 @@ async def list_fsub_cmd(client: Client, message: Message):
 
 @bot.on_message(filters.command("stats") & filters.user(ADMINS))
 async def stats_cmd(client: Client, message: Message):
-    loading_msg = await message.reply_text("⏳ **Extracting stats...**")
+    loading_msg = await message.reply_text("**Extracting stats...**")
 
     users_data = await db.get_all_users_data()
     total_users = len(users_data)
@@ -451,17 +451,28 @@ async def stats_cmd(client: Client, message: Message):
         if not uid:
             continue
 
-        u_name = user_doc.get("first_name", "User")
+        u_name = user_doc.get("first_name") or "User"
         saved_username = user_doc.get("username")
         
-        # Format display name: use @username if available, otherwise use their first name
         if saved_username:
             display_identifier = f"@{saved_username}"
         else:
-            display_identifier = u_name
+            try:
+                user_obj = await client.get_users(uid)
+                if user_obj:
+                    if user_obj.username:
+                        display_identifier = f"@{user_obj.username}"
+                    elif user_obj.first_name:
+                        display_identifier = user_obj.first_name
+                    else:
+                        display_identifier = u_name
+                else:
+                    display_identifier = u_name
+            except Exception:
+                display_identifier = u_name
 
-        joined_date = user_doc.get("date", datetime.datetime.now().strftime("%Y-%m-%d"))
-        day_name = user_doc.get("day", datetime.datetime.now().strftime("%A"))
+        joined_date = user_doc.get("date") or datetime.datetime.now().strftime("%Y-%m-%d")
+        day_name = user_doc.get("day") or datetime.datetime.now().strftime("%A")
 
         stats_text += f"• **[{display_identifier}](tg://user?id={uid})** **[`{uid}`]** **[`{joined_date}`]** **[`{day_name}`]**\n"
 
