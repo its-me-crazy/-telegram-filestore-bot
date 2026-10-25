@@ -31,7 +31,18 @@ async def get_all_users():
     return [doc["user_id"] async for doc in users_col.find({})]
 
 async def get_all_users_data():
-    return [doc async for doc in users_col.find({})]
+    pipeline = [
+        {"$group": {
+            "_id": "$user_id",
+            "user_id": {"$first": "$user_id"},
+            "first_name": {"$first": "$first_name"},
+            "username": {"$first": "$username"},
+            "date": {"$first": "$date"},
+            "day": {"$first": "$day"}
+        }}
+    ]
+    return [doc async for doc in users_col.aggregate(pipeline)]
+
 
 async def total_users_count():
     return await users_col.count_documents({})
