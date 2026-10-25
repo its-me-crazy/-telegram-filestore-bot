@@ -496,7 +496,7 @@ async def ping_handler(client: Client, message: Message):
     sent_msg = await message.reply_text("Pinging...")
     end_time = time.time()
     ping_time = round((end_time - start_time) * 1000, 2)
-    await sent_msg.edit_text(f"🏓 **Pong!**\n`{ping_time}ms`")
+    await sent_msg.edit_text(f"🏓 **Pong!** `{ping_time}ms`")
     
 @bot.on_message(filters.command("broadcast") & filters.user(ADMINS))
 async def broadcast_cmd(client: Client, message: Message):
