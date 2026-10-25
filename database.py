@@ -8,8 +8,7 @@ db = client[DATABASE_NAME]
 users_col = db["users"]
 fsub_col = db["force_subs"]
 
-# User Management (Saves name and join details persistently)
-async def add_user(user_id: int, first_name: str = "User"):
+async def add_user(user_id: int, first_name: str = "User", username: str = None):
     now = datetime.datetime.now()
     # upsert=True creates the document if it doesn't exist, or updates it if it does!
     await users_col.update_one(
@@ -21,7 +20,8 @@ async def add_user(user_id: int, first_name: str = "User"):
                 "day": now.strftime("%A")
             },
             "$set": {
-                "first_name": first_name if first_name and first_name != "User" else "User"
+                "first_name": first_name if first_name and first_name != "User" else "User",
+                "username": username
             }
         },
         upsert=True
@@ -36,7 +36,6 @@ async def get_all_users_data():
 async def total_users_count():
     return await users_col.count_documents({})
 
-# Force Sub Management (Stored safely in MongoDB)
 async def add_fsub_channel(channel_id: int, channel_title: str, invite_link: str):
     await fsub_col.update_one(
         {"channel_id": channel_id},
