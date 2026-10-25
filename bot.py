@@ -64,7 +64,7 @@ async def check_fsub(client: Client, user_id: int):
 async def start_handler(client: Client, message: Message):
     user_id = message.from_user.id
     user_name = message.from_user.first_name
-    await db.add_user(user_id)
+    await db.add_user(user_id, user_name)
     
     args = message.text.split(maxsplit=1)
     param = args[1] if len(args) > 1 else None
@@ -292,7 +292,7 @@ async def about_menu_callback(client: Client, callback: CallbackQuery):
         "›› **Oᴡɴᴇʀ : @Mr_Mohammed_29**\n"
         "›› **Pᴏᴡᴇʀᴇᴅ Bʏ : @Aero_Unity**\n"
         "›› **Sᴜᴘᴘᴏʀᴛ Gʀᴏᴜᴘ : @Coders_Grp**\n\n"
-        "**Aᴅɪᴏs !!** 🥳"
+        "**Aᴅɪᴏs !!**"
     )
     buttons = [
         [InlineKeyboardButton("• Hᴏᴍᴇ •", callback_data="about_back"),
@@ -437,21 +437,25 @@ async def list_fsub_cmd(client: Client, message: Message):
 
 @bot.on_message(filters.command("stats") & filters.user(ADMINS))
 async def stats_cmd(client: Client, message: Message):
-    users = await db.get_all_users()
-    total_users = len(users)
+    users_data = await db.get_all_users_data()
+    total_users = len(users_data)
 
     stats_text = f"📊 **Bᴏᴛ Sᴛᴀᴛɪsᴛɪᴄs**\n\n👤 **Tᴏᴛᴀʟ Uꜱᴇʀꜱ:** `{total_users}`\n\n"
 
-    for uid in users:
-        try:
-            user_obj = await client.get_users(uid)
-            u_name = user_obj.first_name or "Unknown"
-        except Exception:
-            u_name = "User"
+    for user_doc in users_data:
+        uid = user_doc["user_id"]
+        u_name = user_doc.get("first_name", "User")
+        
+        if u_name == "User":
+            try:
+                user_obj = await client.get_users(uid)
+                if user_obj and user_obj.first_name:
+                    u_name = user_obj.first_name
+            except Exception:
+                pass
 
-        now = datetime.datetime.now()
-        joined_date = now.strftime("%Y-%m-%d")
-        day_name = now.strftime("%A")
+        joined_date = user_doc.get("date", datetime.datetime.now().strftime("%Y-%m-%d"))
+        day_name = user_doc.get("day", datetime.datetime.now().strftime("%A"))
 
         stats_text += f"• **[{u_name}](tg://user?id={uid})** `[{uid}]` `[{joined_date}]` `[{day_name}]`\n"
 
