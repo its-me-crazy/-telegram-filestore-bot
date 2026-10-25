@@ -443,7 +443,11 @@ async def stats_cmd(client: Client, message: Message):
     stats_text = f"📊 **Bᴏᴛ Sᴛᴀᴛɪsᴛɪᴄs**\n\n👤 **Tᴏᴛᴀʟ Uꜱᴇʀꜱ:** `{total_users}`\n\n"
 
     for user_doc in users_data:
-        uid = user_doc["user_id"]
+        # Safely get the user ID from any possible field name
+        uid = user_doc.get("user_id") or user_doc.get("id") or user_doc.get("_id")
+        if not uid:
+            continue
+
         u_name = user_doc.get("first_name", "User")
         
         if u_name == "User":
