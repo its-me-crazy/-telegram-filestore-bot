@@ -437,34 +437,48 @@ async def list_fsub_cmd(client: Client, message: Message):
 
 @bot.on_message(filters.command("stats") & filters.user(ADMINS))
 async def stats_cmd(client: Client, message: Message):
+
+    loading_msg = await message.reply_text("⏳ **Extracting stats...**")
+
     users_data = await db.get_all_users_data()
     total_users = len(users_data)
 
     stats_text = f"📊 **Bᴏᴛ Sᴛᴀᴛɪsᴛɪᴄs**\n\n👤 **Tᴏᴛᴀʟ Uꜱᴇʀꜱ:** `{total_users}`\n\n"
 
     for user_doc in users_data:
-        # Safely get the user ID from any possible field name
         uid = user_doc.get("user_id") or user_doc.get("id") or user_doc.get("_id")
         if not uid:
             continue
 
         u_name = user_doc.get("first_name", "User")
-        
-        if u_name == "User":
-            try:
-                user_obj = await client.get_users(uid)
-                if user_obj and user_obj.first_name:
+        username_str = None
+
+        try:
+            user_obj = await client.get_users(uid)
+            if user_obj:
+                if user_obj.first_name:
                     u_name = user_obj.first_name
-            except Exception:
-                pass
+                if user_obj.username:
+                    username_str = f"@{user_obj.username}"
+        except Exception:
+            pass
+
+        # If no public username exists, fall back to showing their display name
+        display_identifier = username_str if username_str else u_name
 
         joined_date = user_doc.get("date", datetime.datetime.now().strftime("%Y-%m-%d"))
         day_name = user_doc.get("day", datetime.datetime.now().strftime("%A"))
 
-        stats_text += f"• **[{u_name}](tg://user?id={uid})** `[{uid}]` `[{joined_date}]` `[{day_name}]`\n"
+        # Formatted in bold as requested
+        stats_text += f"• **[{display_identifier}](tg://user?id={uid})** **[`{uid}`]** **[`{joined_date}`]** **[`{day_name}`]**\n"
 
     buttons = [[InlineKeyboardButton("• Cʟᴏsᴇ •", callback_data="close")]]
-    await message.reply_text(stats_text, reply_markup=InlineKeyboardMarkup(buttons), disable_web_page_preview=True)
+    
+    try:
+        await loading_msg.edit_text(stats_text, reply_markup=InlineKeyboardMarkup(buttons), disable_web_page_preview=True)
+    except Exception:
+        await message.reply_text(stats_text, reply_markup=InlineKeyboardMarkup(buttons), disable_web_page_preview=True)
+
 
 @bot.on_message(filters.command("broadcast") & filters.user(ADMINS))
 async def broadcast_cmd(client: Client, message: Message):
