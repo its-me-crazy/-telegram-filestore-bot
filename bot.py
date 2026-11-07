@@ -185,7 +185,7 @@ async def send_stored_files(client: Client, chat_id: int, param: str):
         
         asyncio.create_task(delete_files_after_delay(client, chat_id, sent_messages, warn_msg, AUTO_DELETE_TIME))
 
-async def delete_files_after_delay(client, chat_id, messages, warn_msg, delay):
+async def delete_files_after_delay(client, chat_id, messages, warn_msg, delay, param):
     await asyncio.sleep(delay)
     for msg in messages:
         try:
@@ -193,10 +193,9 @@ async def delete_files_after_delay(client, chat_id, messages, warn_msg, delay):
         except Exception:
             pass
             
-    # Create the inline button "Get Your File Again!" linking back or handled via callback/button
-    # Since original code didn't specify encoded param callback here, we provide the button cleanly:
+    # Include the param in the callback data so we can re-deliver this exact file!
     warning_buttons = InlineKeyboardMarkup([
-        [InlineKeyboardButton("GET YOUR FILE AGAIN!", callback_data="get_file_again_warn")]
+        [InlineKeyboardButton("GET YOUR FILE AGAIN!", callback_data=f"get_file_{param}")]
     ])
     
     try:
@@ -209,9 +208,12 @@ async def delete_files_after_delay(client, chat_id, messages, warn_msg, delay):
     except Exception:
         pass
 
-@bot.on_callback_query(filters.regex("get_file_again_warn"))
+@bot.on_callback_query(filters.regex(r"^get_file_"))
 async def get_file_again_warn_callback(client: Client, callback: CallbackQuery):
     user_id = callback.from_user.id
+    # Extract the file parameter from callback data
+    param = callback.data.split("get_file_")[1]
+
     unjoined, status_list = await check_fsub(client, user_id)
 
     if unjoined:
@@ -225,7 +227,8 @@ async def get_file_again_warn_callback(client: Client, callback: CallbackQuery):
         if temp_row:
             buttons.append(temp_row)
         
-        buttons.append([InlineKeyboardButton("• Tʀʏ Aɢᴀɪɴ •", callback_data="try_again_none")])
+        # Point the Try Again button back to this specific file param
+        buttons.append([InlineKeyboardButton("• Tʀʏ Aɢᴀɪɴ •", callback_data=f"try_again_{param}")])
 
         text = (
             "**Hɪɪ..! ⚡**\n\n"
@@ -241,7 +244,24 @@ async def get_file_again_warn_callback(client: Client, callback: CallbackQuery):
         await callback.answer("Please join all channels first!", show_alert=True)
         return
 
-    await callback.answer("✅ You are already subscribed! Please send your file command or link again.", show_alert=True)
+    # If joined, clean up the warning message and re-deliver the file immediately!
+    try:
+        await callback.message.delete()
+    except Exception:
+        pass
+
+    checking_msg = await callback.message.reply_photo(
+        photo=FORCE_SUB_IMAGE.strip(),
+        caption="⏳ **Checking subscription...**\n\n**Wait a sec...**"
+    )
+    await asyncio.sleep(1)
+    try:
+        await checking_msg.delete()
+    except Exception:
+        pass
+
+    await send_stored_files(client, callback.message.chat.id, param)
+    await callback.answer("✅ Here is your file!", show_alert=True)
 
 @bot.on_callback_query(filters.regex(r"^try_again_"))
 async def try_again_callback(client: Client, callback: CallbackQuery):
@@ -554,9 +574,25 @@ async def botuptime_handler(client: Client, message: Message):
     ping_time = round((time.time() - start_time) * 1000, 2)
     await temp_ping_msg.delete()
 
-    # Current date & time metrics
+    # Calculate Uptime from BOT_START_TIME
+    uptime_seconds = int(time.time() - BOT_START_TIME)
+    
+    days = uptime_seconds // 86400
+    hours = (uptime_seconds % 86400) // 3600
+    minutes = (uptime_seconds % 3600) // 60
+    seconds = uptime_seconds % 60
+
+    if days > 0:
+        uptime_str = f"{days}d {hours}h {minutes}m {seconds}s"
+    elif hours > 0:
+        uptime_str = f"{hours}h {minutes}m {seconds}s"
+    elif minutes > 0:
+        uptime_str = f"{minutes}m {seconds}s"
+    else:
+        uptime_str = f"{seconds}s"
+
+    # Current date metrics
     now = datetime.datetime.now()
-    current_time = now.strftime("%I:%M:%S %p")
     current_day = now.strftime("%A")
     current_month = now.strftime("%B")
     current_year = now.strftime("%Y")
@@ -564,10 +600,10 @@ async def botuptime_handler(client: Client, message: Message):
 
     uptime_text = (
         f"🤖 **Bᴏᴛ U𝚙ᴛɪᴍᴇ & Sᴛᴀᴛᴜs**\n\n"
-        f"• **Tɪᴍᴇ:** `{current_time}`\n"
+        f"• **U𝚙ᴛɪᴍᴇ:** `{uptime_str}`\n"
         f"• **Dᴀʏ:** `{current_day}`\n"
         f"• **Mᴏɴᴛʜ:** `{current_month}`\n"
-        f"• **Yᴇᴀʀ:** `{current_year}`\n\n"
+        f"• **Yᴇᴀʀ:** `{current_year}`\n"
         f"• **Vᴇʀsɪᴏɴ:** `{bot_version}`\n"
         f"• **Pɪɴɢ:** `{ping_time}ms`"
     )
@@ -585,6 +621,7 @@ async def botuptime_handler(client: Client, message: Message):
             pass
 
     asyncio.create_task(delete_uptime())
+
 
 @bot.on_message(filters.command("broadcast") & filters.user(ADMINS))
 async def broadcast_cmd(client: Client, message: Message):
