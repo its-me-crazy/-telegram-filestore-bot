@@ -723,12 +723,13 @@ if __name__ == "__main__":
     loop.run_until_complete(start_web_server())
     print("Web Server started successfully.")
 
-    print("Testing MongoDB connection...")
+    print("Testing MongoDB connection & running migrations...")
     try:
+        loop.run_until_complete(db.fix_old_users()) # <--- Runs migration safely here
         loop.run_until_complete(db.get_fsub_channels())
-        print("MongoDB connection verified successfully!")
+        print("MongoDB connection & migration verified successfully!")
     except Exception as e:
-        print(f"CRITICAL: MongoDB connection failed: {e}")
+        print(f"CRITICAL: MongoDB setup failed: {e}")
 
     with bot:
         me = bot.get_me()
@@ -736,3 +737,4 @@ if __name__ == "__main__":
         print(f"Authorized Admin IDs: {ADMINS}")
         print("Bot is up and running successfully!")
         idle()
+
