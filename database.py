@@ -5,8 +5,10 @@ from config import MONGO_URI, DATABASE_NAME
 
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
 db = client[DATABASE_NAME]
+
 users_col = db["users"]
 fsub_col = db["force_subs"]
+
 IST = pytz.timezone('Asia/Kolkata')
 
 async def fix_old_users():
@@ -22,10 +24,8 @@ async def fix_old_users():
             }
         }
     )
-    print(f"Updated {result.modified_count} old user records with default IST timestamps.")
-
-import asyncio
-asyncio.run(fix_old_users())
+    if result.modified_count > 0:
+        print(f"Updated {result.modified_count} old user records with default IST timestamps.")
 
 async def add_user(user_id: int, first_name: str = "User", username: str = None):
     now = datetime.datetime.now(IST)
@@ -57,7 +57,7 @@ async def get_all_users_data():
             "first_name": {"$first": "$first_name"},
             "username": {"$first": "$username"},
             "date": {"$first": "$date"},
-            "time": {"$first": "$time"},  # <--- Included time in aggregation grouping
+            "time": {"$first": "$time"},
             "day": {"$first": "$day"}
         }}
     ]
