@@ -5,22 +5,19 @@ from config import MONGO_URI, DATABASE_NAME
 
 client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
 db = client[DATABASE_NAME]
-
 users_col = db["users"]
 fsub_col = db["force_subs"]
-
 IST = pytz.timezone('Asia/Kolkata')
 
-# User Management (Saves name, username, and join details persistently in IST)
 async def add_user(user_id: int, first_name: str = "User", username: str = None):
     now = datetime.datetime.now(IST)
-    # $setOnInsert ensures date and day are ONLY set once when the user first joins!
     await users_col.update_one(
         {"user_id": user_id},
         {
             "$setOnInsert": {
                 "user_id": user_id,
                 "date": now.strftime("%Y-%m-%d"),
+                "time": now.strftime("%I:%M:%S %p"), 
                 "day": now.strftime("%A")
             },
             "$set": {
@@ -42,6 +39,7 @@ async def get_all_users_data():
             "first_name": {"$first": "$first_name"},
             "username": {"$first": "$username"},
             "date": {"$first": "$date"},
+            "time": {"$first": "$time"},  # <--- Included time in aggregation grouping
             "day": {"$first": "$day"}
         }}
     ]
@@ -50,7 +48,6 @@ async def get_all_users_data():
 async def total_users_count():
     return await users_col.count_documents({})
 
-# Force Sub Management (Stored safely in MongoDB)
 async def add_fsub_channel(channel_id: int, channel_title: str, invite_link: str):
     await fsub_col.update_one(
         {"channel_id": channel_id},
