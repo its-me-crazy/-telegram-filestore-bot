@@ -9,6 +9,24 @@ users_col = db["users"]
 fsub_col = db["force_subs"]
 IST = pytz.timezone('Asia/Kolkata')
 
+async def fix_old_users():
+    now = datetime.datetime.now(IST)
+    # Find users missing the date field and update them
+    result = await users_col.update_many(
+        {"date": {"$exists": False}},
+        {
+            "$set": {
+                "date": now.strftime("%Y-%m-%d"),
+                "time": now.strftime("%I:%M:%S %p"),
+                "day": now.strftime("%A")
+            }
+        }
+    )
+    print(f"Updated {result.modified_count} old user records with default IST timestamps.")
+
+import asyncio
+asyncio.run(fix_old_users())
+
 async def add_user(user_id: int, first_name: str = "User", username: str = None):
     now = datetime.datetime.now(IST)
     await users_col.update_one(
