@@ -501,16 +501,37 @@ async def list_fsub_cmd(client: Client, message: Message):
 
     await message.reply_text(text, disable_web_page_preview=True)
 
+USERS_PER_PAGE = 5 
+
 @bot.on_message(filters.command("stats") & filters.user(ADMINS))
 async def stats_cmd(client: Client, message: Message):
     loading_msg = await message.reply_text("**Extracting stats...**")
+    await send_stats_page(client, loading_msg, page=0, edit=True)
 
+async def send_stats_page(client: Client, message_obj, page: int = 0, edit: bool = False):
     users_data = await db.get_all_users_data()
     total_users = len(users_data)
+    
+    if total_users == 0:
+        text = "📊 **Bᴏᴛ Sᴛᴀᴛɪsᴛɪᴄs**\n\n👤 **Tᴏᴛᴀʟ Uꜱᴇʀꜱ:** `0`"
+        buttons = [[InlineKeyboardButton("• Cʟᴏsᴇ •", callback_data="close")]]
+        if edit:
+            await message_obj.edit_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+        else:
+            await message_obj.reply_text(text, reply_markup=InlineKeyboardMarkup(buttons))
+        return
 
-    stats_text = f"📊 **Bᴏᴛ Sᴛᴀᴛɪsᴛɪᴄs**\n\n👤 **Tᴏᴛᴀʟ Uꜱᴇʀꜱ:** `{total_users}`\n\n"
+    # Pagination math
+    total_pages = (total_users + USERS_PER_PAGE - 1) // USERS_PER_PAGE
+    page = max(0, min(page, total_pages - 1))
+    
+    start_idx = page * USERS_PER_PAGE
+    end_idx = start_idx + USERS_PER_PAGE
+    current_page_users = users_data[start_idx:end_idx]
 
-    for user_doc in users_data:
+    stats_text = f"📊 **Bᴏᴛ Sᴛᴀᴛɪsᴛɪᴄs**\n\n👤 **Tᴏᴛᴀʟ Uꜱᴇʀꜱ:** `{total_users}`\n📄 **Pᴀɢᴇ:** `{page + 1}/{total_pages}`\n\n"
+
+    for idx, user_doc in enumerate(current_page_users, start_idx + 1):
         uid = user_doc.get("user_id") or user_doc.get("id") or user_doc.get("_id")
         if not uid:
             continue
@@ -518,34 +539,53 @@ async def stats_cmd(client: Client, message: Message):
         u_name = user_doc.get("first_name") or "User"
         saved_username = user_doc.get("username")
         
-        if saved_username:
-            display_identifier = f"@{saved_username}"
-        else:
-            try:
-                user_obj = await client.get_users(uid)
-                if user_obj:
-                    if user_obj.username:
-                        display_identifier = f"@{user_obj.username}"
-                    elif user_obj.first_name:
-                        display_identifier = user_obj.first_name
-                    else:
-                        display_identifier = u_name
-                else:
-                    display_identifier = u_name
-            except Exception:
-                display_identifier = u_name
+        username_str = f"@{saved_username}" if saved_username else "None"
 
-        joined_date = user_doc.get("date") or datetime.datetime.now().strftime("%Y-%m-%d")
-        day_name = user_doc.get("day") or datetime.datetime.now().strftime("%A")
+        joined_date = user_doc.get("date", "N/A")
+        joined_time = user_doc.get("time", "N/A")
+        day_name = user_doc.get("day", "N/A")
 
-        stats_text += f"• **[{display_identifier}](tg://user?id={uid})** **[`{uid}`]** **[`{joined_date}`]** **[`{day_name}`]**\n"
+        stats_text += (
+            f"**{idx}.** [{u_name}](tg://user?id={uid})\n"
+            f" • **Nᴀᴍᴇ:** `{u_name}`\n"
+            f" • **Usᴇʀɴᴀᴍᴇ:** `{username_str}`\n"
+            f" • **Iᴅ:** `{uid}`\n"
+            f" • **Bᴏᴛ Sᴛᴀʀᴛᴇᴅ:** `{day_name}, {joined_date} | {joined_time}`\n\n"
+        )
 
-    buttons = [[InlineKeyboardButton("• Cʟᴏsᴇ •", callback_data="close")]]
+    # Pagination buttons
+    nav_buttons = []
+    if total_pages > 1:
+        if page > 0:
+            nav_buttons.append(InlineKeyboardButton("• Bᴀᴄᴋ •", callback_data=f"stats_page_{page - 1}"))
+        nav_buttons.append(InlineKeyboardButton(f"🗓️ {page + 1}/{total_pages}", callback_data="stats_noop"))
+        if page < total_pages - 1:
+            nav_buttons.append(InlineKeyboardButton("• Nᴇxᴛ •", callback_data=f"stats_page_{page + 1}"))
+
+    buttons = []
+    if nav_buttons:
+        buttons.append(nav_buttons)
+    buttons.append([InlineKeyboardButton("• Cʟᴏsᴇ •", callback_data="close")])
+
+    markup = InlineKeyboardMarkup(buttons)
     
     try:
-        await loading_msg.edit_text(stats_text, reply_markup=InlineKeyboardMarkup(buttons), disable_web_page_preview=True)
+        if edit:
+            await message_obj.edit_text(stats_text, reply_markup=markup, disable_web_page_preview=True)
+        else:
+            await message_obj.reply_text(stats_text, reply_markup=markup, disable_web_page_preview=True)
     except Exception:
-        await message.reply_text(stats_text, reply_markup=InlineKeyboardMarkup(buttons), disable_web_page_preview=True)
+        pass
+
+@bot.on_callback_query(filters.regex(r"^stats_page_"))
+async def stats_pagination_callback(client: Client, callback: CallbackQuery):
+    page = int(callback.data.split("stats_page_")[1])
+    await callback.answer()
+    await send_stats_page(client, callback.message, page=page, edit=True)
+
+@bot.on_callback_query(filters.regex("stats_noop"))
+async def stats_noop_callback(client: Client, callback: CallbackQuery):
+    await callback.answer("📍 Current page indicator", show_alert=False)
 
 @bot.on_message(filters.command("ping") & filters.private)
 async def ping_handler(client: Client, message: Message):
