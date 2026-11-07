@@ -28,6 +28,9 @@ else:
 
 FORWARD_RESTRICTION = True
 
+# Record bot startup time for uptime tracking
+BOT_START_TIME = time.time()
+
 print(f"Initialized Admin IDs list: {ADMINS}")
 
 print("Initializing Pyrogram Client...")
@@ -91,7 +94,7 @@ async def start_handler(client: Client, message: Message):
         text = (
             "**Hɪɪ..! ⚡**\n\n"
             "**Pʟᴇᴀsᴇ Jᴏɪɴ Aʟʟ Oғ Oᴜʀ Cʜᴀɴɴᴇʟs Fɪʀsᴛ Tʜᴇɴ Cʟɪᴄᴋ Oɴ Tʀʏ Aɢᴀɪɴ...❗️**\n\n"
-            "**Cʜᴀɴɴᴇʟ Sᴜʙsᴄʀɪᴘᴛɪᴏɴ Sᴛᴀᴛᴜs:**\n\n" + "\n".join(status_list)
+            "**Cʜᴀɴɴᴇʟ SᴜʙsᴄʀɪᴘᴛɪᴏN Sᴛᴀᴛᴜs:**\n\n" + "\n".join(status_list)
         )
 
         await message.reply_photo(
@@ -189,15 +192,57 @@ async def delete_files_after_delay(client, chat_id, messages, warn_msg, delay):
             await client.delete_messages(chat_id, msg.id)
         except Exception:
             pass
+            
+    # Create the inline button "Get Your File Again!" linking back or handled via callback/button
+    # Since original code didn't specify encoded param callback here, we provide the button cleanly:
+    warning_buttons = InlineKeyboardMarkup([
+        [InlineKeyboardButton("GET YOUR FILE AGAIN!", callback_data="get_file_again_warn")]
+    ])
+    
     try:
         await client.edit_message_text(
             chat_id=chat_id,
             message_id=warn_msg.id,
-            text="**Your files have been deleted!**"
+            text="**Your Video / File Is Successfully Deleted** ✅",
+            reply_markup=warning_buttons
         )
     except Exception:
         pass
+
+@bot.on_callback_query(filters.regex("get_file_again_warn"))
+async def get_file_again_warn_callback(client: Client, callback: CallbackQuery):
+    user_id = callback.from_user.id
+    unjoined, status_list = await check_fsub(client, user_id)
+
+    if unjoined:
+        buttons = []
+        temp_row = []
+        for ch in unjoined:
+            temp_row.append(InlineKeyboardButton(ch["channel_title"], url=ch["invite_link"]))
+            if len(temp_row) == 2:
+                buttons.append(temp_row)
+                temp_row = []
+        if temp_row:
+            buttons.append(temp_row)
         
+        buttons.append([InlineKeyboardButton("• Tʀʏ Aɢᴀɪɴ •", callback_data="try_again_none")])
+
+        text = (
+            "**Hɪɪ..! ⚡**\n\n"
+            "**Pʟᴇᴀsᴇ Jᴏɪɴ Aʟʟ Oғ Oᴜʀ Cʜᴀɴɴᴇʟs Fɪʀsᴛ Tʜᴇɴ Cʟɪᴄᴋ Oɴ Tʀʏ Aɢᴀɪɴ...❗️**\n\n"
+            "**Cʜᴀɴɴᴇʟ SᴜʙsᴄʀɪᴘᴛɪᴏN Sᴛᴀᴛᴜs:**\n\n" + "\n".join(status_list)
+        )
+
+        await callback.message.reply_photo(
+            photo=FORCE_SUB_IMAGE.strip(),
+            caption=text,
+            reply_markup=InlineKeyboardMarkup(buttons)
+        )
+        await callback.answer("Please join all channels first!", show_alert=True)
+        return
+
+    await callback.answer("✅ You are already subscribed! Please send your file command or link again.", show_alert=True)
+
 @bot.on_callback_query(filters.regex(r"^try_again_"))
 async def try_again_callback(client: Client, callback: CallbackQuery):
     user_id = callback.from_user.id
@@ -225,7 +270,7 @@ async def try_again_callback(client: Client, callback: CallbackQuery):
         text = (
             "**Hɪɪ..! ⚡**\n\n"
             " **Pʟᴇᴀsᴇ Jᴏɪɴ Aʟʟ Oғ Oᴜʀ Cʜᴀɴɴᴇʟs Fɪʀsᴛ Tʜᴇɴ Cʟɪᴄᴋ Oɴ Tʀʏ Aɢᴀɪɴ...❗️**\n\n"
-            "**Cʜᴀɴɴᴇʟ Sᴜʙsᴄʀɪᴘᴛɪᴏɴ Sᴛᴀᴛᴜs:**\n\n" + "\n".join(status_list)
+            "**Cʜᴀɴɴᴇʟ SᴜʙsᴄʀɪᴘᴛɪᴏN Sᴛᴀᴛᴜs:**\n\n" + "\n".join(status_list)
         )
         
         try:
@@ -374,7 +419,6 @@ async def batch_handler(client: Client, message: Message):
         return
 
     def extract_id(arg: str) -> str:
-        # If user passed a full Telegram URL, extract the last part (message ID)
         if "t.me/" in arg:
             return arg.strip("/").split("/")[-1]
         return arg
@@ -489,7 +533,6 @@ async def ping_handler(client: Client, message: Message):
 
     unjoined, status_list = await check_fsub(client, user_id)
     if unjoined:
-        # Do not show anything if they haven't joined yet
         return
         
     start_time = time.time()
@@ -497,7 +540,52 @@ async def ping_handler(client: Client, message: Message):
     end_time = time.time()
     ping_time = round((end_time - start_time) * 1000, 2)
     await sent_msg.edit_text(f"🏓 **Pong!** `{ping_time}ms`")
+
+@bot.on_message(filters.command("botuptime") & filters.private)
+async def botuptime_handler(client: Client, message: Message):
+    user_id = message.from_user.id
+    unjoined, status_list = await check_fsub(client, user_id)
+    if unjoined:
+        return
+
+    # Calculate Ping
+    start_time = time.time()
+    temp_ping_msg = await message.reply_text("Calculating uptime...")
+    ping_time = round((time.time() - start_time) * 1000, 2)
+    await temp_ping_msg.delete()
+
+    # Current date & time metrics
+    now = datetime.datetime.now()
+    current_time = now.strftime("%I:%M:%S %p")
+    current_day = now.strftime("%A")
+    current_month = now.strftime("%B")
+    current_year = now.strftime("%Y")
+    bot_version = "v1.0.0"
+
+    uptime_text = (
+        f"🤖 **Bᴏᴛ U𝚙ᴛɪᴍᴇ & Sᴛᴀᴛᴜs**\n\n"
+        f"• **Tɪᴍᴇ:** `{current_time}`\n"
+        f"• **Dᴀʏ:** `{current_day}`\n"
+        f"• **Mᴏɴᴛʜ:** `{current_month}`\n"
+        f"• **Yᴇᴀʀ:** `{current_year}`\n\n"
+        f"• **Vᴇʀsɪᴏɴ:** `{bot_version}`\n"
+        f"• **Pɪɴɢ:** `{ping_time}ms`"
+    )
+
+    buttons = InlineKeyboardMarkup([[InlineKeyboardButton("• Cʟᴏsᴇ •", callback_data="close")]])
     
+    sent_uptime = await message.reply_text(uptime_text, reply_markup=buttons)
+
+    # Auto delete after 30 seconds
+    async def delete_uptime():
+        await asyncio.sleep(30)
+        try:
+            await sent_uptime.delete()
+        except Exception:
+            pass
+
+    asyncio.create_task(delete_uptime())
+
 @bot.on_message(filters.command("broadcast") & filters.user(ADMINS))
 async def broadcast_cmd(client: Client, message: Message):
     if not message.reply_to_message:
@@ -517,7 +605,6 @@ async def broadcast_cmd(client: Client, message: Message):
 
     for user_id in users:
         try:
-            # Forwarding the message preserves text, media, formatting, AND inline buttons entirely without errors
             sent_msg = await reply.forward(chat_id=user_id)
             
             if should_pin:
@@ -536,7 +623,6 @@ async def broadcast_cmd(client: Client, message: Message):
             print(f"Broadcast error for user {user_id}: {e}")
             failed += 1
 
-    # Send completion summary in bold
     await message.reply_text(
         f"✅ **Broadcast Completed!**\n\n"
         f"• **Successful:** `{success}`\n"
