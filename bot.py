@@ -183,7 +183,7 @@ async def send_stored_files(client: Client, chat_id: int, param: str):
             reply_to_message_id=last_msg.id
         )
         
-        asyncio.create_task(delete_files_after_delay(client, chat_id, sent_messages, warn_msg, AUTO_DELETE_TIME))
+        asyncio.create_task(delete_files_after_delay(client, chat_id, sent_messages, warn_msg, AUTO_DELETE_TIME, param))
 
 async def delete_files_after_delay(client, chat_id, messages, warn_msg, delay, param):
     await asyncio.sleep(delay)
