@@ -8,9 +8,25 @@ users_col = db["users"]
 fsub_col = db["force_subs"]
 
 # User Management
-async def add_user(user_id: int):
-    if not await users_col.find_one({"user_id": user_id}):
-        await users_col.insert_one({"user_id": user_id})
+async def add_user(user_id: int, first_name: str = "User", username: str = None):
+    now = datetime.datetime.now(IST)
+    await users_col.update_one(
+        {"user_id": user_id},
+        {
+            "$setOnInsert": {
+                "user_id": user_id,
+                "date": now.strftime("%Y-%m-%d"),
+                "time": now.strftime("%I:%M:%S %p"),
+                "day": now.strftime("%A")
+            },
+            "$set": {
+                "first_name": first_name if first_name and first_name != "User" else "User",
+                "username": username
+            }
+        },
+        upsert=True
+    )
+
 
 async def get_all_users():
     return [doc["user_id"] async for doc in users_col.find({})]
