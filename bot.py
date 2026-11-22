@@ -740,6 +740,10 @@ if __name__ == "__main__":
 
     with bot:
         me = bot.get_me()
+        try:
+            bot.get_chat(DB_CHANNEL_ID)
+        except Exception as e:
+            print(f"Warning: could not pre-load DB_CHANNEL_ID {DB_CHANNEL_ID}: {e}")
         print(f"SUCCESS! Bot is online as: @{me.username} (ID: {me.id})")
         print(f"Authorized Admin IDs: {ADMINS}")
         print("Bot is up and running successfully!")
