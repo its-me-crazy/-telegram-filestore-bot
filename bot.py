@@ -97,12 +97,19 @@ async def start_handler(client: Client, message: Message):
             "**Cʜᴀɴɴᴇʟ SᴜʙsᴄʀɪᴘᴛɪᴏN Sᴛᴀᴛᴜs:**\n\n" + "\n".join(status_list)
         )
 
-        await message.reply_photo(
-            photo=FORCE_SUB_IMAGE.strip(),
-            caption=text,
-            reply_markup=InlineKeyboardMarkup(buttons)
-        )
+        try:
+            await message.reply_photo(
+                photo=FORCE_SUB_IMAGE.strip(),
+                caption=text,
+                reply_markup=InlineKeyboardMarkup(buttons)
+            )
+        except Exception:
+            await message.reply_text(
+                text=text,
+                reply_markup=InlineKeyboardMarkup(buttons)
+            )
         return
+
 
     if not param:
         text = (
@@ -114,11 +121,17 @@ async def start_handler(client: Client, message: Message):
             [InlineKeyboardButton("• Aʙᴏᴜᴛ •", callback_data="about_menu"),
              InlineKeyboardButton("• Cʟᴏsᴇ •", callback_data="close")]
         ]
-        await message.reply_photo(
-            photo=ABOUT_IMAGE.strip(),
-            caption=text,
-            reply_markup=InlineKeyboardMarkup(buttons)
-        )
+        try:
+            await message.reply_photo(
+                photo=ABOUT_IMAGE.strip(),
+                caption=text,
+                reply_markup=InlineKeyboardMarkup(buttons)
+            )
+        except Exception:
+            await message.reply_text(
+                text=text,
+                reply_markup=InlineKeyboardMarkup(buttons)
+            )
         return
 
     checking_msg = await message.reply_photo(
@@ -741,7 +754,7 @@ if __name__ == "__main__":
     with bot:
         me = bot.get_me()
         try:
-            bot.get_chat(DB_CHANNEL_ID)
+            bot.loop.run_until_complete(bot.get_chat(DB_CHANNEL_ID))
         except Exception as e:
             print(f"Warning: could not pre-load DB_CHANNEL_ID {DB_CHANNEL_ID}: {e}")
         print(f"SUCCESS! Bot is online as: @{me.username} (ID: {me.id})")
